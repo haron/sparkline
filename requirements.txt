@@ -1,0 +1,5 @@
+fastapi==0.108.0
+matplotlib==3.8.2
+sentry-sdk==1.39.1
+uvicorn[standard]==0.25.0
+aiomcache==0.8.1

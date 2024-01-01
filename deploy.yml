@@ -1,0 +1,48 @@
+#!/usr/bin/env ansible-playbook
+---
+- name: deploy Sparkline
+  hosts: all
+  strategy: free
+  gather_facts: false
+  vars:
+    project: sparkline
+    env: prod
+    prefix: /var/www/{{ project }}-{{ env }}
+    python_version: "3.12"
+  tasks:
+    - name: linter
+      local_action: shell which flake8 && flake8 --config ~/.flake8 *.py
+
+    - name: install Python {{ python_version }}
+      shell: apt-get -qq update && apt-get -y install python{{ python_version }} python{{ python_version}}-dev python{{ python_version}}-venv
+      tags: full
+
+    - name: create virtualenv
+      command: python{{ python_version }} -m venv --upgrade {{ prefix }}
+      args:
+        creates: "{{ prefix }}/bin/python{{ python_version }}"
+      tags: full
+
+    - name: install pip
+      shell: curl -s https://bootstrap.pypa.io/get-pip.py | bin/python
+      args:
+        chdir: "{{ prefix }}"
+        creates: "{{ prefix }}/bin/pip"
+      tags: full
+
+    - name: upload directory {{ playbook_dir }} to {{ prefix }}
+      synchronize: src="{{ playbook_dir }}/" dest={{ prefix }}
+
+    - name: install deps
+      command: bin/pip install -r requirements.txt
+      args:
+        chdir: "{{ prefix }}"
+      tags: full
+
+    - name: install supervisor config
+      file: state=link src={{ prefix }}/supervisor.conf dest=/etc/supervisor/conf.d/{{ project }}.conf
+      tags: full
+
+    - name: restart process
+      supervisorctl: name="{{ project }}" state=restarted
+      tags: restart

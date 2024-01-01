@@ -1,0 +1,17 @@
+- /.*
+- /*.yml
+- /*.sqlite*
+- __pycache__
+- /ansible*
+- /hosts
+- /db
+- /etc
+- /tmp
+- *.sw*
+- *.git*
+- *.bak
+- *.sqlite*
+- *.pyc
+- .DS_Store
+- /localpy
+- local_settings.py
