@@ -29,10 +29,10 @@ async def favicon():
 
 
 @app.get("/{data}.{ext}")
-async def api(data, ext, request: Request, yticks: bool = False):
+async def api(data, ext, request: Request, yticks: bool = False, hticks_start: int | None = None):
     if ext not in image_formats:
         raise UnknownFormat(f"UnknownFormat: {ext}")
-    content = await cached_sparkline(request, parse_list(data), yticks=yticks, format=ext)
+    content = await cached_sparkline(request, parse_list(data), yticks=yticks, format=ext, hticks_start=hticks_start)
     return Response(content=content, media_type=f"image/{ext}")
 
 
@@ -49,13 +49,13 @@ async def cached_sparkline(request, *args, **kwargs):
     return ret
 
 
-def sparkline(points, yticks=False, format="png"):
+def sparkline(points, yticks=False, hticks_start=None, hticks_step=6, format="png"):
     fig, ax = plt.subplots(1, 1, figsize=(5, 1))
     plt.plot(points, color='b')
     plt.plot(0, points[0], color='b', marker='o')
     [v.set_visible(False) for v in ax.spines.values()]
-    ax.set_xticks([])
     ax.tick_params(axis='both', which='both', length=0, labelsize="large")
+    ax.set_xticks([])
     ax.set_yticks([])
     if yticks:
         max_tick = math.ceil(max(points))
@@ -63,6 +63,12 @@ def sparkline(points, yticks=False, format="png"):
         mid_tick = round((max_tick + min_tick) / 2, 1)
         ticks = [min_tick, mid_tick, max_tick]
         ax.set_yticks(ticks)
+    if hticks_start:
+        hticks_step = 6
+        htick_positions = range(0, len(points))
+        htick_labels = [(hticks_start + i) % 24 if i % hticks_step == 0 else '·' for i in htick_positions]
+        ax.set_xticks(htick_positions)
+        ax.set_xticklabels(htick_labels)
     ret = io.BytesIO()
     plt.savefig(ret, dpi=170, bbox_inches='tight', format=format)
     return ret.getvalue()
