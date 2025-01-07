@@ -7,42 +7,53 @@
   vars:
     project: sparkline
     env: prod
-    prefix: /var/www/{{ project }}-{{ env }}
-    python_version: "3.12"
+    slug: "{{ project }}-{{ env }}"
+    prefix: /var/www/{{ slug }}
   tasks:
-    - name: linter
-      local_action: shell which flake8 && flake8 --config ~/.flake8 *.py
-
-    - name: install Python {{ python_version }}
-      shell: apt-get -qq update && apt-get -y install python{{ python_version }} python{{ python_version}}-dev python{{ python_version}}-venv
-      tags: full
-
-    - name: create virtualenv
-      command: python{{ python_version }} -m venv --upgrade {{ prefix }}
-      args:
-        creates: "{{ prefix }}/bin/python{{ python_version }}"
-      tags: full
-
-    - name: install pip
-      shell: curl -s https://bootstrap.pypa.io/get-pip.py | bin/python
-      args:
-        chdir: "{{ prefix }}"
-        creates: "{{ prefix }}/bin/pip"
+    - name: remove existing virtualenv
+      file: path="{{ prefix }}/.venv" state=absent
       tags: full
 
     - name: upload directory {{ playbook_dir }} to {{ prefix }}
       synchronize: src="{{ playbook_dir }}/" dest={{ prefix }}
 
-    - name: install deps
-      command: bin/pip install -r requirements.txt
-      args:
-        chdir: "{{ prefix }}"
+    - name: create cache and tools directories
+      file: path={{ item }} state=directory owner=www-data
+      loop:
+        - /var/www/.local
+        - /var/www/.cache
+        - /var/www/.config
+        - /var/www/.ansible
+        - "{{ prefix }}/.venv"
       tags: full
 
+    - name: cleanup UV cache
+      command: uv cache clean
+      args:
+        chdir: "{{ prefix }}"
+      become: true
+      become_user: www-data
+      tags: full
+
+    - name: create virtualenv
+      shell: uv venv -q
+      args:
+        chdir: "{{ prefix }}"
+      become: true
+      become_user: www-data
+      tags: full
+
+    - name: install dependencies
+      shell: uv sync --frozen || uv sync --frozen --refresh
+      args:
+        chdir: "{{ prefix }}"
+      become: true
+      become_user: www-data
+
     - name: install supervisor config
-      file: state=link src={{ prefix }}/supervisor.conf dest=/etc/supervisor/conf.d/{{ project }}.conf
+      file: state=link src={{ prefix }}/supervisor-{{ env }}.conf dest=/etc/supervisor/conf.d/{{ slug }}.conf
       tags: full
 
     - name: restart process
-      supervisorctl: name="{{ project }}" state=restarted
+      supervisorctl: name="{{ slug }}" state=restarted
       tags: restart
