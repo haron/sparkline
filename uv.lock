@@ -428,11 +428,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiomcache", specifier = ">=0.8.1" },
-    { name = "fastapi", specifier = ">=0.108.0" },
-    { name = "matplotlib", specifier = ">=3.8.2" },
-    { name = "sentry-sdk", specifier = ">=1.39.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.25.0" },
+    { name = "aiomcache", specifier = ">=0.8.2" },
+    { name = "fastapi", specifier = ">=0.115.6" },
+    { name = "matplotlib", specifier = ">=3.10.0" },
+    { name = "sentry-sdk", specifier = ">=2.19.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
 ]
 
 [[package]]
