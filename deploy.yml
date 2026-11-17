@@ -1,59 +1,63 @@
 #!/usr/bin/env ansible-playbook
 ---
-- name: deploy Sparkline
+- name: Deploy Sparkline
   hosts: all
   strategy: free
   gather_facts: false
   vars:
     project: sparkline
     env: prod
+    owner: deploy
     slug: "{{ project }}-{{ env }}"
     prefix: /var/www/{{ slug }}
+    uv_env:
+      UV_PYTHON_INSTALL_DIR: "{{ prefix }}/.python" # keep interpreter readable by supervisor's `nobody`
   tasks:
-    - name: remove existing virtualenv
-      file: path="{{ prefix }}/.venv" state=absent
+    - name: Remove existing virtualenv and interpreter
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: ["{{ prefix }}/.venv", "{{ prefix }}/.python"]
       tags: full
 
-    - name: upload directory {{ playbook_dir }} to {{ prefix }}
-      synchronize: src="{{ playbook_dir }}/" dest={{ prefix }}
+    - name: Create project directory
+      ansible.builtin.file:
+        path: "{{ prefix }}"
+        state: directory
+        owner: "{{ owner }}"
+        group: "{{ owner }}"
+        mode: "0755"
 
-    - name: create cache and tools directories
-      file: path={{ item }} state=directory owner=www-data
-      loop:
-        - /var/www/.local
-        - /var/www/.cache
-        - /var/www/.config
-        - /var/www/.ansible
-        - "{{ prefix }}/.venv"
-      tags: full
+    - name: Upload {{ playbook_dir }} to {{ prefix }}
+      ansible.posix.synchronize:
+        src: "{{ playbook_dir }}/"
+        dest: "{{ prefix }}"
+        rsync_path: sudo -u {{ owner }} rsync
 
-    - name: cleanup UV cache
-      command: uv cache clean
+    - name: Install dependencies
+      ansible.builtin.command: uv sync --frozen
       args:
         chdir: "{{ prefix }}"
+      environment: "{{ uv_env }}"
       become: true
-      become_user: www-data
+      become_user: "{{ owner }}"
+      changed_when: true
+
+    - name: Install supervisor config
+      ansible.builtin.file:
+        state: link
+        src: "{{ prefix }}/supervisor-{{ env }}.conf"
+        dest: /etc/supervisor/conf.d/{{ slug }}.conf
       tags: full
 
-    - name: create virtualenv
-      shell: uv venv -q
-      args:
-        chdir: "{{ prefix }}"
-      become: true
-      become_user: www-data
+    - name: Register process with supervisor
+      community.general.supervisorctl:
+        name: "{{ slug }}"
+        state: present
       tags: full
 
-    - name: install dependencies
-      shell: uv sync --frozen || uv sync --frozen --refresh
-      args:
-        chdir: "{{ prefix }}"
-      become: true
-      become_user: www-data
-
-    - name: install supervisor config
-      file: state=link src={{ prefix }}/supervisor-{{ env }}.conf dest=/etc/supervisor/conf.d/{{ slug }}.conf
-      tags: full
-
-    - name: restart process
-      supervisorctl: name="{{ slug }}" state=restarted
+    - name: Restart process
+      community.general.supervisorctl:
+        name: "{{ slug }}"
+        state: restarted
       tags: restart
