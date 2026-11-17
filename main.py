@@ -1,14 +1,14 @@
-from fastapi import FastAPI
+import hashlib
+import io
+import math
+
+import aiomcache
 import matplotlib
 import matplotlib.pyplot as plt
-import math
-from fastapi import Response, Request
-import io
-import settings
 import sentry_sdk
-import aiomcache
-import hashlib
+from fastapi import FastAPI, Request, Response
 
+import settings
 
 app = FastAPI()
 matplotlib.use("agg")
@@ -50,7 +50,7 @@ async def cached_sparkline(request, *args, **kwargs):
 
 
 def sparkline(points, yticks=False, hticks_start=None, hticks_step=6, format="png"):
-    fig, ax = plt.subplots(1, 1, figsize=(5, 1))
+    _fig, ax = plt.subplots(1, 1, figsize=(5, 1))
     plt.plot(points, color="b")
     plt.plot(0, points[0], color="b", marker="o")
     [v.set_visible(False) for v in ax.spines.values()]
@@ -65,7 +65,7 @@ def sparkline(points, yticks=False, hticks_start=None, hticks_step=6, format="pn
         ax.set_yticks(ticks)
     if hticks_start:
         hticks_step = 6
-        htick_positions = range(0, len(points))
+        htick_positions = range(len(points))
         htick_labels = [(hticks_start + i) % 24 if i % hticks_step == 0 else "·" for i in htick_positions]
         ax.set_xticks(htick_positions)
         ax.set_xticklabels(htick_labels)
