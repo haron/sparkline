@@ -1,16 +1,28 @@
 SHELL := /usr/bin/env -S bash -O globstar # makes work globs like **/*.py
 .DEFAULT_GOAL := deploy
+# the host stays out of this public repo: one line in the gitignored `hosts`
+HOST ?= $(shell cat hosts)
+SLUG := sparkline-prod
+PREFIX := /var/www/$(SLUG)
 
 outdated:
 	uv tree -d 1 --outdated | grep -E '──.*latest:'
 
+# Code, .env (0600, the sandboxed unit reads it as a credential), then ansible-pets' app-deploy
+# (uv sync, restart; FRESH=--fresh rebuilds the venv). No CI deploy: public repo, no runner.
 deploy: linter
-	uv sync
-	ansible-playbook deploy.yml --skip-tags=full
+	rsync -a -F ./ deploy@$(HOST):$(PREFIX)/
+	ssh deploy@$(HOST) 'umask 077 && cat > $(PREFIX)/.env' < env-prod
+	ssh deploy@$(HOST) app-deploy $(SLUG) $(FRESH)
 
 full-deploy:
-	uv sync
-	ansible-playbook deploy.yml
+	$(MAKE) deploy FRESH=--fresh
+
+logs:
+	ssh -t deploy@$(HOST) journalctl -eu app@$(SLUG)
+
+restart:
+	ssh deploy@$(HOST) systemctl restart app@$(SLUG)
 
 init: clean
 	uv venv -q
@@ -23,7 +35,7 @@ githooks:
 	git config --local core.hooksPath .githooks
 
 linter: githooks
-	python -m py_compile **/*.py
+	uv run python -m py_compile **/*.py
 	uvx ruff format
 	uvx ruff check --fix
 

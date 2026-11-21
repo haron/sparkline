@@ -12,6 +12,7 @@ dependencies = [
     "sentry-sdk>=2.19.2",
     "uvicorn[standard]>=0.34.0",
     "aiomcache>=0.8.2",
+    "python-decouple>=3.8",
 ]
 
 [tool.ruff]

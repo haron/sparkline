@@ -16,3 +16,7 @@
 - .DS_Store
 - /localpy
 - local_settings.py
+- *env-*
+- Makefile
+- /hosts
+- /public/.*
