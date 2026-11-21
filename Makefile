@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env -S bash -O globstar # makes work globs like **/*.py
 .DEFAULT_GOAL := deploy
 # the host stays out of this public repo: one line in the gitignored `hosts`
-HOST ?= $(shell cat hosts)
+HOST ?= $(or $(shell cat hosts 2>/dev/null),$(error put the deploy host in ./hosts))
 SLUG := sparkline-prod
 PREFIX := /var/www/$(SLUG)
 
